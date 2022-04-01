@@ -1,0 +1,21 @@
+services:
+  ML:
+    build: .
+    image: joy-ml
+    container_name: joy_ml
+    ports:
+      - "60000:8888"
+    volumes:
+      - ./:/workspace
+    ipc: host # important for PyTorch dataloaders
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    privileged: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 2
+              capabilities: [gpu]
