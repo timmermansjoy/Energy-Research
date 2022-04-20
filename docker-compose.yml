@@ -1,8 +1,8 @@
 services:
   ML:
     build: .
-    image: joy-ml
-    container_name: joy_ml
+    image: joy-ml2
+    container_name: joy-ml
     ports:
       - "60000:8888"
     volumes:

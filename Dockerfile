@@ -1,10 +1,10 @@
 FROM pytorchlightning/pytorch_lightning
 
+RUN apt update && apt upgrade -y &&\
+    apt-get install -y htop neofetch
 
-# Expose port 8888 for JupyterLab
-EXPOSE 22 8888
+# RUN apt-get purge *nvidia* && apt autoremove -y &&\
+#     apt-get update && \
+#     apt install nvidia-driver-510
 
-RUN apt update && apt install -y htop neofetch && \
-    pip install jupyterlab && \
-    pip install darts && \
-    pip install pytorch-forecasting fastparquet wandb
+RUN pip install jupyterlab pytorch-forecasting fastparquet wandb darts plotly
