@@ -7,5 +7,8 @@ def find_gaps(df, Date_col_name="DateTime"):
     deltas = df['DateTime'].diff()[1:]
     gaps = deltas[deltas > timedelta(minutes=30)]
     # Print results
-    print(f'{len(gaps)} gaps with median gap duration: {gaps.median()}')
-    print(gaps)
+    if not gaps.empty:
+        #print(f'{len(gaps)} gaps with median gap duration: {gaps.median()}')
+        #print(gaps)
+        return gaps
+    return pd.DataFrame()
