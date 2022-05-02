@@ -7,4 +7,4 @@ RUN apt update && apt upgrade -y &&\
 #     apt-get update && \
 #     apt install nvidia-driver-510
 
-RUN pip install jupyterlab pytorch-forecasting fastparquet wandb darts plotly
+RUN pip install jupyterlab pytorch-forecasting fastparquet wandb darts plotly python-dotenv
