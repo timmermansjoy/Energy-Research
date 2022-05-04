@@ -41,6 +41,9 @@ def display_forecast(
     """
 
     plt.figure(figsize=fig_size)
+    plt.ylim(0, 3)
+    plt.rcParams["figure.facecolor"] = "white"
+
     if start_date is not None:
         actual_series = actual_series.drop_before(start_date)
     actual_series.univariate_component(0).plot(label="actual")
