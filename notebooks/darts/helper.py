@@ -56,10 +56,11 @@ def display_forecast(
     if save:
         if fig_name and model_name:
             # check if directory exists and create if not
-            if not os.path.exists(f"../../Plots/{model_name}"):
-                os.makedirs(f"../../Plots/{model_name}")
-            plt.savefig(f"../../Plots/{model_name}/{fig_name}.png")
+            if not os.path.exists(f"../../../Plots/{model_name}"):
+                os.makedirs(f"../../../Plots/{model_name}")
+            plt.savefig(f"../../../Plots/{model_name}/{fig_name}.png")
         elif fig_name:
-            plt.savefig(f"../../Plots/{fig_name}.png")
+            plt.savefig(f"../../../Plots/{fig_name}.png")
         else:
-            plt.savefig(f"../../Plots/{forecast_type}_forecast.png")
+            plt.savefig(f"../../../Plots/{forecast_type}_forecast.png")
+    return plt
