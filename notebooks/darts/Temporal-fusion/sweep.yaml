@@ -1,0 +1,33 @@
+program: train.py
+method: bayes
+metric:
+  goal: minimize
+  name: val-loss
+early_terminate:
+  type: hyperband
+  min_iter: 10
+parameters:
+  hidden_size:
+    max: 256
+    min: 32
+    distribution: int_uniform
+  lstm_layers:
+    max: 20
+    min: 2
+    distribution: int_uniform
+  num_attention_heads:
+    max: 15
+    min: 1
+    distribution: int_uniform
+  dropout:
+    max: 1
+    min: 0.01
+    distribution: uniform
+  # households:
+  #   max: 3000
+  #   min: 500
+  #   distribution: int_uniform
+  # epochs:
+  #   max: 200
+  #   min: 10
+  #   distribution: int_uniform

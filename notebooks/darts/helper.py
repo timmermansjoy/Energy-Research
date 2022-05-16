@@ -1,19 +1,25 @@
+import imp
 import pandas as pd
 import matplotlib.pyplot as plt
 from darts.metrics import mape, r2_score
 import os
 
+import glob
+from darts import TimeSeries
+from tqdm.contrib.concurrent import process_map
 
-def find_gaps(df, Date_col_name="DateTime"):
+
+def find_gaps(df, Date_col_name="DateTime", delta=15):
     from datetime import datetime, timedelta
-
-    df["DateTime"] = pd.to_datetime(df["DateTime"])
-    deltas = df["DateTime"].diff()[1:]
-    gaps = deltas[deltas > timedelta(minutes=30)]
+    if isinstance(df.index, pd.DatetimeIndex):
+        df["DateTime"] = pd.to_datetime(df.index)
+    # df["DateTime"] = pd.to_datetime(df)
+    deltas = df[Date_col_name].diff()[1:]
+    gaps = deltas[deltas > timedelta(minutes=delta)]
     # Print results
     if not gaps.empty:
-        # print(f'{len(gaps)} gaps with median gap duration: {gaps.median()}')
-        # print(gaps)
+        print(f'{len(gaps)} gaps with median gap duration: {gaps.median()}')
+        print(gaps)
         return gaps
     return pd.DataFrame()
 
