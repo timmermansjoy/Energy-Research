@@ -6,10 +6,25 @@
 
 ## About
 
-In this repo is my peak energy forecasting research. It is for my internship at PXL for the [Digital Energy](https://www.pxl.be/Pub/onderzoek/Projecten/Projecten-Smart-ICT/33337-Digital-Energy.html?cel=GUID-264A29238D6747228DDEE08063A1F731) project. 
+In this repo is my peak energy forecasting research. It is for my internship at PXL for the [Digital Energy](https://www.pxl.be/Pub/onderzoek/Projecten/Projecten-Smart-ICT/33337-Digital-Energy.html?cel=GUID-264A29238D6747228DDEE08063A1F731) project.
 
 ## Features
 
 The research uses the [London dataset](https://www.kaggle.com/datasets/timmermansjoy/london-electricity-usage-per-household-2011-2014) which is comprised of data from 5000 smart meters.
 
-All of the research is done in the [`notebooks`](notebooks) folder. Here the most used folder is Darts and as the folder sugests the two main architectures that are compared are [N-beats](https://arxiv.org/pdf/1905.10437.pdf) and [Temporal Fusion Transformers](https://arxiv.org/pdf/1912.09363.pdf).
+All of the research is done in the [`notebooks`](notebooks) folder. Here the most used folder is `Darts` and as the folder sugests the two main architectures that are compared are [N-beats](https://arxiv.org/pdf/1905.10437.pdf) and [Temporal Fusion Transformers](https://arxiv.org/pdf/1912.09363.pdf).
+
+The training scripts are made with argparser so you can easily change settings. and see information using the `--help` flag. `python train.py --help`
+
+
+## Running the scripts
+
+place your data in the Data folder. Preferably the [London dataset](https://www.kaggle.com/datasets/timmermansjoy/london-electricity-usage-per-household-2011-2014) so it works without changing anyting.
+
+There is a docker-compose file that starts up the docker containers. to get started run the following commands:
+
+```bash
+docker-compose up
+docker exec -it joy-ml /bin/bash
+```
+Or use the docker vscode extension.

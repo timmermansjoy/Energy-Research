@@ -32,22 +32,21 @@ from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
 from tqdm.contrib.concurrent import process_map
 import tqdm
-
+import argparse
 
 AVAILABLE_GPUS = torch.cuda.device_count()
 AVAILABLE_CPUS = os.cpu_count()
 TRAINING_DATA_PATH = "../../../Data/london_clean/*.csv"
+MODEL_NAME = sys.argv[1] if len(sys.argv) > 1 else "generic_nbeats"
+DEFAULT_VALUES = dict(
+    num_stacks=3,
+    num_blocks=8,
+    num_layers=2,
+    layer_widths=1150,
+)
 
 print(f"Available GPUs: {AVAILABLE_GPUS}")
 print(f"Available CPUs: {AVAILABLE_CPUS}")
-
-
-DEFAULT_VALUES = dict(
-    num_stacks=5,
-    num_blocks=4,
-    num_layers=3,
-    layer_widths=1150,
-)
 
 
 def reader(x):
@@ -59,10 +58,15 @@ def splitter(x):
     return train, val
 
 
-def main():
+def main(args):
+    MODEL_NAME = args.name
+    HOUSEHOLDS = args.households
+    TRAIN = args.no_train
+
+
     torch.cuda.empty_cache()
 
-    wandb.init(project="Digital-Energy", config=DEFAULT_VALUES)
+    wandb.init(project="Digital-Energy", name=MODEL_NAME, config=DEFAULT_VALUES, resume="allow", group="compare")
     config = wandb.config
 
 
@@ -77,16 +81,11 @@ def main():
     #     series_list.append(series)
 
     # done for multiprocessing
-    file_list = sorted(glob.glob(TRAINING_DATA_PATH))[:2000]
+    file_list = sorted(glob.glob(TRAINING_DATA_PATH))[:HOUSEHOLDS]
     if file_list == []:
         raise Exception("No files found")
     series_list = process_map(reader, file_list, chunksize=5)
 
-
-    # for i, x in enumerate(series_list):
-    #     x.plot()
-    #     plt.savefig(f'../../../Plots/testing/{i}.png')
-    #     plt.close()
 
     print("Creating dataset...")
     ## sets
@@ -98,82 +97,71 @@ def main():
         validation_sets.append(val)
 
 
+
+
     ## ---- MODEL ---- ##
 
     early_stop_callback = EarlyStopping(
         monitor="val_loss",
         min_delta=0.003,
-        patience=10,
+        patience=4,
         verbose=False,
         mode="min"
         )
 
     ## check if model already exists
 
-    wandb_logger = WandbLogger(project="Digital-Energy", log_model=True)
-    # checkpoint_callback = ModelCheckpoint(monitor="val_loss", mode="min")
+    wandb_logger = WandbLogger(log_model=True)
+    checkpoint_callback = ModelCheckpoint(monitor="val_loss", mode="min")
 
-
-    model = NBEATSModel(
-        input_chunk_length=96,
-        output_chunk_length=96,
-        generic_architecture=True,
-        num_stacks=config.num_stacks,
-        num_blocks=config.num_blocks,
-        num_layers=config.num_layers,
-        layer_widths=config.layer_widths,
-        n_epochs=200,
-        nr_epochs_val_period=1,
-        batch_size=2048,
-        work_dir="../../../Models",
-        save_checkpoints=False,
-        pl_trainer_kwargs={
-        "enable_progress_bar": True,
-        "enable_model_summary": True,
-        "accelerator": "gpu",
-        "devices": 2, # use all available GPUs (this can be done due to this script not being in a notebook)
-        "strategy": DDPStrategy(find_unused_parameters=False),
-        "logger": wandb_logger,
-        "callbacks": [early_stop_callback]
-        }
-    )
+    if os.path.exists(f"../../../Models/{MODEL_NAME}/checkpoints/"):
+        print(f"Loading model {MODEL_NAME}...")
+        model = NBEATSModel.load_from_checkpoint(work_dir="../../../Models/", model_name=f"{MODEL_NAME}", best=True)
+    else:
+        print("Creating model...")
+        model = NBEATSModel(
+            input_chunk_length=96,
+            output_chunk_length=96,
+            generic_architecture=True,
+            num_stacks=config.num_stacks,
+            num_blocks=config.num_blocks,
+            num_layers=config.num_layers,
+            layer_widths=config.layer_widths,
+            n_epochs=20,
+            nr_epochs_val_period=1,
+            batch_size=2048,
+            work_dir="../../../Models",
+            model_name = MODEL_NAME,
+            save_checkpoints=True,
+            pl_trainer_kwargs={
+            "enable_progress_bar": True,
+            "enable_model_summary": True,
+            "accelerator": "gpu",
+            "devices": [0], # use all available GPUs (this can be done due to this script not being in a notebook)
+            # "strategy": DDPStrategy(find_unused_parameters=False),
+            "logger": wandb_logger,
+            "callbacks": [early_stop_callback, checkpoint_callback],
+            # "profiler":"pytorch",
+            }
+        )
 
 
     ## ---- TRAIN ---- ##
-
-    model.fit(series=training_sets, val_series=validation_sets, num_loader_workers=10)
+    if TRAIN:
+        model.fit(series=training_sets, val_series=validation_sets, num_loader_workers=AVAILABLE_CPUS)
 
 
     ## ---- EVALUATE ---- ##
 
-        ## test data
-    START = 3000
-    for i, x in enumerate(sorted(glob.glob(TRAINING_DATA_PATH))[START:START+2]):
+    helper.eval(model, log=True)
 
-        df = pd.read_csv(x)
-        df["DateTime"] = pd.to_datetime(df['DateTime'])
-        series = TimeSeries.from_dataframe(df, value_cols=['KWHhh'], time_col="DateTime").astype(np.float32)
-        series = series[-600:]
-
-        pred_series = model.historical_forecasts(
-            series,
-            forecast_horizon=1,
-            stride=1,
-            retrain=False,
-            verbose=False,
-        )
-
-        fig = helper.display_forecast(pred_series, series, "1 day", save=True, fig_name=f"{i}-test", fig_size=(20,10))
-
-        wandb.log({
-            "mape": mape(series, pred_series),
-            "mse": mse(series, pred_series),
-            "rmse": rmse(series, pred_series),
-            "r2": r2_score(series, pred_series),
-            "result": fig
-            })
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-n", "--name", help="the name that the model will have while saving and in wandb")
+    parser.add_argument("--no-train", help="makes it so the model doesnt get trained, usefull for checkpoints", action="store_false")
+    parser.add_argument("--households", help="the number of households used to train on", type=int, default=1000)
+    args = parser.parse_args()
     freeze_support()
-    main()
+    main(args)

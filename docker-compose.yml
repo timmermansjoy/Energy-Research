@@ -7,8 +7,6 @@ services:
       - ./:/workspace
     ipc: host # important for PyTorch dataloaders
     runtime: nvidia
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=["0"]
     privileged: true
     command: bash -c "while true; do sleep 1; done"
     deploy:
@@ -16,26 +14,4 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["0"]
-              capabilities: [gpu]
-
-
-  ML2:
-    build: .
-    image: joy-ml2
-    container_name: joy-ml2
-    volumes:
-      - ./:/workspace
-    ipc: host # important for PyTorch dataloaders
-    runtime: nvidia
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=["1"]
-    privileged: true
-    command: bash -c "while true; do sleep 1; done"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ["1"]
               capabilities: [gpu]

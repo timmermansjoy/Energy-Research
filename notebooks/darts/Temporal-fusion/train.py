@@ -2,6 +2,7 @@ import enum
 from multiprocessing.dummy import freeze_support
 import os
 import sys
+from tokenize import group
 from dotenv import load_dotenv
 load_dotenv()
 os.environ['WANDB_NOTEBOOK_NAME'] = 'pytorch_stats_own_data.ipynb'
@@ -15,6 +16,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+import argparse
 
 from darts import TimeSeries
 from darts.models import TFTModel
@@ -33,21 +35,16 @@ from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
 from tqdm.contrib.concurrent import process_map
 import tqdm
+import argparse
 
 
 AVAILABLE_GPUS = torch.cuda.device_count()
 AVAILABLE_CPUS = os.cpu_count()
 TRAINING_DATA_PATH = "../../../Data/london_clean/*.csv"
-HOUSEHOLDS = 100
-
-print(f"Available GPUs: {AVAILABLE_GPUS}")
-print(f"Available CPUs: {AVAILABLE_CPUS}")
-
-
 DEFAULT_VALUES = dict(
-    hidden_size=64,
-    lstm_layers=2,
-    num_attention_heads=4,
+    hidden_size=90,
+    lstm_layers=8,
+    num_attention_heads=3,
     dropout=0.1,
 )
 
@@ -62,8 +59,16 @@ def splitter(x):
 
 
 def main():
+    MODEL_NAME = args.name
+    HOUSEHOLDS = args.households
+    TRAIN = args.no_train
+
+    print(f"Available GPUs: {AVAILABLE_GPUS}")
+    print(f"Available CPUs: {AVAILABLE_CPUS}")
+
+
     torch.cuda.empty_cache()
-    wandb.init(project="Digital-Energy", config=DEFAULT_VALUES)
+    wandb.init(project="Digital-Energy", name=MODEL_NAME, config=DEFAULT_VALUES, resume="allow", group="compare")
     config = wandb.config
 
     ## ---- LOAD DATA ---- ##
@@ -94,8 +99,9 @@ def main():
         mode="min"
         )
 
-    wandb_logger = WandbLogger(project="Digital-Energy", log_model="all")
-    # checkpoint_callback = ModelCheckpoint(monitor="val_loss", mode="max")
+    wandb.init(project="Digital-Energy", name=MODEL_NAME, config=DEFAULT_VALUES, resume="allow", group="compare")
+    wandb_logger = WandbLogger(project="Digital-Energy", log_model="all", save_top_k=3)
+    checkpoint_callback = ModelCheckpoint(monitor="val_loss", mode="min")
 
 
     quantiles = [
@@ -139,17 +145,17 @@ def main():
         n_epochs=20,
         add_relative_index=True,
         add_encoders=None,
-        work_dir="../../Models",
-        save_checkpoints=False,
-        # model_name=MODEL_NAME,
+        work_dir="../../../Models",
+        save_checkpoints=True,
+        model_name=MODEL_NAME,
         pl_trainer_kwargs={
         "enable_progress_bar": True,
         "enable_model_summary": True,
         "accelerator": "gpu",
-        "devices": 1,
+        "devices": [0],
         # "strategy": "ddp",
         "logger": wandb_logger,
-        "callbacks": [early_stop_callback]
+        "callbacks": [early_stop_callback, checkpoint_callback]
         },
         likelihood=QuantileRegression(
             quantiles=quantiles
@@ -158,41 +164,20 @@ def main():
         random_state=42,
     )
 
-
-
-    model.fit(series=training_sets, val_series=validation_sets, num_loader_workers=AVAILABLE_CPUS, max_samples_per_ts=500)
+    if TRAIN:
+        model.fit(series=training_sets, val_series=validation_sets, num_loader_workers=AVAILABLE_CPUS//3, max_samples_per_ts=2000)
 
 
     ## ---- EVALUATE ---- ##
     print("Evaluating...")
-            ## test data
-    START = 3000
-    for i, x in enumerate(sorted(glob.glob(TRAINING_DATA_PATH))[START:START+2]):
-
-        df = pd.read_csv(x)
-        df["DateTime"] = pd.to_datetime(df['DateTime'])
-        series = TimeSeries.from_dataframe(df, value_cols=['KWHhh'], time_col="DateTime").astype(np.float32)
-        series = series[-600:]
-
-        pred_series = model.historical_forecasts(
-            series,
-            forecast_horizon=1,
-            stride=1,
-            retrain=False,
-            verbose=False,
-        )
-
-        fig = helper.display_forecast(pred_series, series, "1 day", save=False, fig_name=f"{i}", fig_size=(20,10))
-
-        wandb.log({
-            "mape": mape(series, pred_series),
-            "mse": mse(series, pred_series),
-            "rmse": rmse(series, pred_series),
-            "r2": r2_score(series, pred_series),
-            "result": fig,
-            })
+    helper.eval(model, future_covariates=False, data_normalized=False)
 
 
 if __name__ == "__main__":
     freeze_support()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-n", "--name", help="the name that the model will have while saving and in wandb")
+    parser.add_argument("--no-train", help="makes it so the model doesnt get trained, usefull for checkpoints", action="store_false")
+    parser.add_argument("--households", help="the number of households used to train on", type=int, default=1000)
+    args = parser.parse_args()
     main()
